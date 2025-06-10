@@ -4,6 +4,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import streamlit as st
 import pandas as pd
+import requests
 from datetime import datetime, timedelta, date
 from app.data_collector import fetch_climate_data
 from app.anomaly_detector import detect_anomalies
@@ -13,6 +14,20 @@ from app.epic_fetcher import fetch_epic_thumbnails
 # New imports for satellite map
 import folium
 from streamlit_folium import folium_static
+
+# Helper: Get city name from lat/lon
+
+def get_city_from_coords(lat, lon):
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        headers = {"User-Agent": "ClimaAnomaly-App"}
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        address = data.get("address", {})
+        return address.get("city") or address.get("town") or address.get("village") or address.get("state") or "Unknown Area"
+    except Exception as e:
+        print(f"[ERROR] Reverse geocoding failed: {e}")
+        return "Unknown Area"
 
 # Page config
 st.set_page_config(page_title='ClimaAnomaly', layout='wide')
@@ -44,7 +59,13 @@ if selected_city != 'Custom':
 # Display current location name or coordinates
 current_lat = st.session_state.get('lat', 18.5204)
 current_lon = st.session_state.get('lon', 73.8567)
-loc_label = selected_city if selected_city != 'Custom' else f"{current_lat:.6f}, {current_lon:.6f}"
+
+if selected_city != 'Custom':
+    loc_label = selected_city
+else:
+    city_name = get_city_from_coords(current_lat, current_lon)
+    loc_label = f"{city_name} ({current_lat:.6f}, {current_lon:.6f})"
+
 st.sidebar.markdown(f"**Current Location:** {loc_label}")
 
 # Coordinates Form: input both lat & lon and update on single submit
@@ -89,7 +110,7 @@ end_str = end_date.strftime('%Y%m%d')
 
 # Main Dashboard
 st.markdown('---')
-st.subheader('📥 Fetching and Processing Climate Data')
+st.subheader('📅 Fetching and Processing Climate Data')
 load_state = st.text('Loading data...')
 
 try:
@@ -108,7 +129,7 @@ if df is not None and st.checkbox('Show Raw Data'):
 
 if df is not None:
     # Date selector
-    st.subheader('📅 Select Date to View (within loaded range)')
+    st.subheader('🗕️ Select Date to View (within loaded range)')
     valid_dates = df['DATE'].dt.date.drop_duplicates().tolist()
     selected_date = st.date_input(
         'Select a date',
@@ -134,7 +155,7 @@ if df is not None:
     st.line_chart(forecast_df.set_index('ds')[['yhat', 'yhat_lower', 'yhat_upper']])
 
     # EPIC Imagery
-    st.subheader('🛰️ EPIC Satellite Imagery')
+    st.subheader('🚁 EPIC Satellite Imagery')
     today = date.today()
     if selected_date >= today:
         st.warning('EPIC imagery not available for today/future dates.')
@@ -151,7 +172,6 @@ if df is not None:
                     st.image(img['url'], caption=img['datetime'], use_container_width=True)
         else:
             st.warning('No EPIC images available for this date.')
-
 
 # Footer
 st.markdown('---')
