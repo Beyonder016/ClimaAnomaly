@@ -1,4 +1,3 @@
-# requirements.txt
 streamlit
 pandas
 numpy
@@ -6,3 +5,5 @@ requests
 scikit-learn
 prophet
 joblib
+folium
+streamlit-folium
